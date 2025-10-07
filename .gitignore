@@ -20,3 +20,5 @@ prisma/*.db
 
 # Misc
 .DS_Store
+.env
+.env.docker
