@@ -1,10 +1,13 @@
 import { redirect } from "next/navigation";
+import AnalyticsSummary from "@/components/analytics-summary";
 import LinkGoogleAccountButton from "@/components/link-google-account-button";
 import SyncJobPlanner from "@/components/sync-job-planner";
 import type { CalendarOption } from "@/components/sync-job-planner";
 import SyncJobsDashboard from "@/components/sync-jobs-dashboard";
 import { getAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { recordPageView } from "@/lib/telemetry";
+import { JobRunStatus, TelemetryEventType } from "@prisma/client";
 
 export default async function HomePage() {
   const session = await getAuthSession();
@@ -13,31 +16,103 @@ export default async function HomePage() {
     redirect("/signin");
   }
 
-  const displayName = session.user?.name ?? session.user?.email ?? "there";
-  const linkedAccounts = await prisma.account.findMany({
-    where: { userId: session.user.id },
-    orderBy: { createdAt: "asc" }
+  await recordPageView({
+    userId: session.user.id,
+    path: "/",
   });
-  const googleAccounts = linkedAccounts.filter((account) => account.provider === "google");
 
-  const calendars = await prisma.calendar.findMany({
-    where: {
-      account: {
-        userId: session.user.id
+  const displayName = session.user?.name ?? session.user?.email ?? "there";
+  const [
+    linkedAccounts,
+    calendars,
+    syncJobs,
+    pageViewAggregation,
+    jobRunAggregations
+  ] = await Promise.all([
+    prisma.account.findMany({
+      where: { userId: session.user.id },
+      orderBy: { createdAt: "asc" }
+    }),
+    prisma.calendar.findMany({
+      where: {
+        account: {
+          userId: session.user.id
+        }
+      },
+      include: {
+        account: {
+          select: {
+            id: true,
+            providerAccountId: true
+          }
+        }
+      },
+      orderBy: {
+        summary: "asc"
       }
-    },
-    include: {
-      account: {
-        select: {
-          id: true,
-          providerAccountId: true
+    }),
+    prisma.syncJob.findMany({
+      where: {
+        ownerId: session.user.id
+      },
+      orderBy: {
+        createdAt: "desc"
+      },
+      include: {
+        sourceCalendar: {
+          include: { account: true }
+        },
+        destinationCalendar: {
+          include: { account: true }
+        },
+        runs: {
+          orderBy: { startedAt: "desc" },
+          take: 5
         }
       }
+    }),
+    prisma.telemetryEvent.aggregate({
+      where: {
+        userId: session.user.id,
+        type: TelemetryEventType.PAGE_VIEW
+      },
+      _count: { _all: true },
+      _max: { createdAt: true }
+    }),
+    prisma.jobRun.groupBy({
+      by: ["status"],
+      where: {
+        job: {
+          ownerId: session.user.id
+        }
+      },
+      _count: { _all: true }
+    })
+  ]);
+
+  const googleAccounts = linkedAccounts.filter((account) => account.provider === "google");
+
+  const jobRunStatusCounts = jobRunAggregations.reduce<Record<JobRunStatus, number>>(
+    (acc, group) => {
+      acc[group.status] = group._count._all;
+      return acc;
     },
-    orderBy: {
-      summary: "asc"
+    {
+      [JobRunStatus.PENDING]: 0,
+      [JobRunStatus.RUNNING]: 0,
+      [JobRunStatus.SUCCESS]: 0,
+      [JobRunStatus.FAILED]: 0,
+      [JobRunStatus.CANCELLED]: 0
     }
-  });
+  );
+
+  const successfulRuns = jobRunStatusCounts[JobRunStatus.SUCCESS];
+  const failedRuns = jobRunStatusCounts[JobRunStatus.FAILED];
+  const cancelledRuns = jobRunStatusCounts[JobRunStatus.CANCELLED];
+  const completedRuns = successfulRuns + failedRuns + cancelledRuns;
+  const jobSuccessRate = completedRuns > 0 ? successfulRuns / completedRuns : null;
+  const totalPageViews = pageViewAggregation._count?._all ?? 0;
+  const lastPageViewAt = pageViewAggregation._max?.createdAt ?? null;
 
   const formatAccountId = (value: string) => {
     if (value.length <= 8) {
@@ -50,27 +125,6 @@ export default async function HomePage() {
   const linkedDateFormatter = new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeStyle: "short"
-  });
-
-  const syncJobs = await prisma.syncJob.findMany({
-    where: {
-      ownerId: session.user.id
-    },
-    orderBy: {
-      createdAt: "desc"
-    },
-    include: {
-      sourceCalendar: {
-        include: { account: true }
-      },
-      destinationCalendar: {
-        include: { account: true }
-      },
-      runs: {
-        orderBy: { startedAt: "desc" },
-        take: 5
-      }
-    }
   });
 
   const calendarOptions: CalendarOption[] = calendars.map((calendar) => ({
@@ -118,6 +172,15 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+      <AnalyticsSummary
+        totalPageViews={totalPageViews}
+        lastPageViewAt={lastPageViewAt}
+        jobSuccessRate={jobSuccessRate}
+        completedRuns={completedRuns}
+        successfulRuns={successfulRuns}
+        failedRuns={failedRuns}
+        cancelledRuns={cancelledRuns}
+      />
       <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>

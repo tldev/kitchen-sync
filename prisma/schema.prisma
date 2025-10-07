@@ -37,6 +37,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   ownedSyncJobs SyncJob[] @relation("SyncJobOwner")
+  telemetry     TelemetryEvent[]
 }
 
 model Account {
@@ -133,4 +134,21 @@ model JobRun {
 
   @@index([status])
   @@index([jobId, startedAt])
+}
+
+enum TelemetryEventType {
+  PAGE_VIEW
+}
+
+model TelemetryEvent {
+  id        String              @id @default(uuid()) @db.Uuid
+  userId    String?             @db.Uuid
+  type      TelemetryEventType
+  path      String
+  metadata  Json?
+  createdAt DateTime            @default(now())
+  user      User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([type, createdAt])
+  @@index([userId, createdAt])
 }
