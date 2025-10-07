@@ -1,6 +1,7 @@
 import cron, { ScheduledTask } from "node-cron";
 import { JobRunStatus, Prisma, SyncJobCadence, SyncJobStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { processPendingJobRuns } from "@/lib/calendarsync/job-runner";
 
 const DEFAULT_CRON_EXPRESSION = "*/1 * * * *";
 const LOG_PREFIX = "[sync-job-scheduler]";
@@ -156,7 +157,29 @@ export function startSyncJobScheduler(
     );
   }
 
-  let tickInFlight = false;
+let tickInFlight = false;
+let executionInFlight = false;
+
+async function runPendingExecutions(logger: SchedulerLogger): Promise<void> {
+  if (executionInFlight) {
+    logger.debug?.(`${LOG_PREFIX} job execution already in progress, skipping.`);
+    return;
+  }
+
+  executionInFlight = true;
+  try {
+    const { processed, succeeded, failed } = await processPendingJobRuns({ logger });
+    if (processed > 0) {
+      logger.info?.(
+        `${LOG_PREFIX} processed ${processed} pending job run${processed === 1 ? "" : "s"} (${succeeded} succeeded, ${failed} failed).`,
+      );
+    }
+  } catch (error) {
+    logger.error?.(`${LOG_PREFIX} failed to execute pending job runs`, error);
+  } finally {
+    executionInFlight = false;
+  }
+}
 
   const task = cron.schedule(
     cronExpression,
@@ -176,6 +199,8 @@ export function startSyncJobScheduler(
         } else {
           logger.debug?.(`${LOG_PREFIX} no due sync jobs found during scheduled run.`);
         }
+
+        await runPendingExecutions(logger);
       } catch (error) {
         logger.error?.(`${LOG_PREFIX} failed to enqueue due sync jobs`, error);
       } finally {
@@ -201,6 +226,10 @@ export function startSyncJobScheduler(
         } else {
           logger.debug?.(`${LOG_PREFIX} no due sync jobs found during startup.`);
         }
+        return runPendingExecutions(logger);
+      })
+      .then(() => {
+        // No-op: execution handled above.
       })
       .catch((error) => {
         logger.error?.(`${LOG_PREFIX} failed to enqueue due sync jobs during startup`, error);
