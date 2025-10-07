@@ -58,33 +58,33 @@ export default function CalendarDiscoveryTrigger({
   }
 
   return (
-    <div className="rounded-xl border border-emerald-400/40 bg-emerald-500/5 p-4">
+    <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
       {isDiscovering ? (
         <div className="flex items-center gap-3">
-          <div className="h-5 w-5 animate-spin rounded-full border-2 border-emerald-400 border-t-transparent" />
-          <p className="text-sm text-emerald-200">Discovering calendars from your linked Google accounts…</p>
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+          <p className="text-sm text-blue-900">Discovering calendars…</p>
         </div>
       ) : error ? (
         <div className="space-y-2">
-          <p className="text-sm font-semibold text-rose-200">Calendar discovery failed</p>
-          <p className="text-sm text-rose-100/80">{error}</p>
+          <p className="text-sm font-semibold text-red-900">Discovery failed</p>
+          <p className="text-sm text-red-800">{error}</p>
           <button
             type="button"
             onClick={() => void discoverCalendars()}
-            className="rounded-lg border border-emerald-500/50 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-200 transition hover:border-emerald-400 hover:bg-emerald-400/10"
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
           >
-            Retry discovery
+            Retry
           </button>
         </div>
       ) : (
         <div className="space-y-2">
-          <p className="text-sm text-emerald-200">No calendars found yet.</p>
+          <p className="text-sm text-blue-900">No calendars found.</p>
           <button
             type="button"
             onClick={() => void discoverCalendars()}
-            className="rounded-lg border border-emerald-500/50 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-200 transition hover:border-emerald-400 hover:bg-emerald-400/10"
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
           >
-            Discover calendars
+            Discover
           </button>
         </div>
       )}

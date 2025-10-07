@@ -183,6 +183,88 @@ async function safeJson(response: Response): Promise<unknown> {
   }
 }
 
+async function processAccountDiscovery(account: AccountWithTokens): Promise<CalendarDiscoveryResult> {
+  if (!account.refresh_token && !account.access_token) {
+    return {
+      accountId: account.id,
+      providerAccountId: account.providerAccountId,
+      status: "skipped",
+      discovered: 0,
+      stored: 0,
+      message: "No OAuth tokens available for this account"
+    };
+  }
+
+  try {
+    const accessToken = account.refresh_token
+      ? (await exchangeRefreshToken(account.refresh_token)).access_token!
+      : account.access_token;
+
+    if (!accessToken) {
+      return {
+        accountId: account.id,
+        providerAccountId: account.providerAccountId,
+        status: "error",
+        discovered: 0,
+        stored: 0,
+        message: "Unable to obtain an access token"
+      };
+    }
+
+    const calendars = await fetchCalendars(accessToken);
+    const stored = await upsertCalendarsForAccount(account, calendars);
+
+    return {
+      accountId: account.id,
+      providerAccountId: account.providerAccountId,
+      status: "success",
+      discovered: calendars.length,
+      stored
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Unknown error during calendar discovery";
+
+    return {
+      accountId: account.id,
+      providerAccountId: account.providerAccountId,
+      status: "error",
+      discovered: 0,
+      stored: 0,
+      message
+    };
+  }
+}
+
+export async function discoverCalendarsForAccount(userId: string, accountId: string): Promise<CalendarDiscoveryResult> {
+  const account = await prisma.account.findFirst({
+    where: {
+      id: accountId,
+      userId,
+      provider: "google"
+    },
+    select: {
+      id: true,
+      providerAccountId: true,
+      refresh_token: true,
+      access_token: true
+    }
+  });
+
+  if (!account) {
+    throw new Error("Account not found or access denied");
+  }
+
+  const decryptedAccount: AccountWithTokens = {
+    id: account.id,
+    providerAccountId: account.providerAccountId,
+    refresh_token: maybeDecryptToken(account.refresh_token),
+    access_token: maybeDecryptToken(account.access_token)
+  };
+
+  return processAccountDiscovery(decryptedAccount);
+}
+
 export async function discoverCalendarsForUser(userId: string): Promise<CalendarDiscoveryResult[]> {
   const accounts = await prisma.account.findMany({
     where: {
@@ -211,59 +293,128 @@ export async function discoverCalendarsForUser(userId: string): Promise<Calendar
       access_token: maybeDecryptToken(account.access_token)
     };
 
-    if (!decryptedAccount.refresh_token && !decryptedAccount.access_token) {
-      results.push({
-        accountId: decryptedAccount.id,
-        providerAccountId: decryptedAccount.providerAccountId,
-        status: "skipped",
-        discovered: 0,
-        stored: 0,
-        message: "No OAuth tokens available for this account"
-      });
+    const result = await processAccountDiscovery(decryptedAccount);
+    results.push(result);
+  }
+
+  return results;
+}
+
+export type LiveCalendar = {
+  id: string;
+  googleCalendarId: string;
+  summary: string;
+  timeZone: string;
+  description: string | null;
+  color: string | null;
+  accessRole: string | null;
+  accountId: string;
+  providerAccountId: string;
+};
+
+/**
+ * Fetches calendars directly from Google's API and ensures they're stored in the database.
+ * This ensures the dropdown always shows current data from Google while maintaining valid database references.
+ */
+export async function fetchLiveCalendarsForUser(userId: string): Promise<LiveCalendar[]> {
+  const accounts = await prisma.account.findMany({
+    where: {
+      userId,
+      provider: "google"
+    },
+    select: {
+      id: true,
+      providerAccountId: true,
+      refresh_token: true,
+      access_token: true
+    }
+  });
+
+  if (accounts.length === 0) {
+    return [];
+  }
+
+  const allCalendars: LiveCalendar[] = [];
+
+  for (const account of accounts) {
+    const decryptedRefreshToken = maybeDecryptToken(account.refresh_token);
+    const decryptedAccessToken = maybeDecryptToken(account.access_token);
+
+    if (!decryptedRefreshToken && !decryptedAccessToken) {
       continue;
     }
 
     try {
-      const accessToken = decryptedAccount.refresh_token
-        ? (await exchangeRefreshToken(decryptedAccount.refresh_token)).access_token!
-        : decryptedAccount.access_token;
+      const accessToken = decryptedRefreshToken
+        ? (await exchangeRefreshToken(decryptedRefreshToken)).access_token!
+        : decryptedAccessToken;
 
       if (!accessToken) {
-        results.push({
-          accountId: decryptedAccount.id,
-          providerAccountId: decryptedAccount.providerAccountId,
-          status: "error",
-          discovered: 0,
-          stored: 0,
-          message: "Unable to obtain an access token"
-        });
         continue;
       }
 
       const calendars = await fetchCalendars(accessToken);
-      const stored = await upsertCalendarsForAccount(decryptedAccount, calendars);
 
-      results.push({
-        accountId: decryptedAccount.id,
-        providerAccountId: decryptedAccount.providerAccountId,
-        status: "success",
-        discovered: calendars.length,
-        stored
-      });
+      // Upsert each calendar to ensure we have valid database IDs
+      for (const item of calendars) {
+        const googleCalendarId = item.id;
+        if (!googleCalendarId) {
+          continue;
+        }
+
+        const summary = item.summaryOverride ?? item.summary ?? googleCalendarId;
+        const timeZone = item.timeZone ?? "UTC";
+        const description = item.description ?? null;
+        const color = item.backgroundColor ?? null;
+        const accessRole = item.accessRole ?? null;
+
+        // Upsert to database to get/create the actual UUID
+        const dbCalendar = await prisma.calendar.upsert({
+          where: {
+            accountId_googleCalendarId: {
+              accountId: account.id,
+              googleCalendarId
+            }
+          },
+          update: {
+            summary,
+            timeZone,
+            description,
+            color,
+            accessRole
+          },
+          create: {
+            accountId: account.id,
+            googleCalendarId,
+            summary,
+            timeZone,
+            description,
+            color,
+            accessRole
+          },
+          select: {
+            id: true
+          }
+        });
+
+        allCalendars.push({
+          id: dbCalendar.id, // Use the actual database UUID
+          googleCalendarId,
+          summary,
+          timeZone,
+          description,
+          color,
+          accessRole,
+          accountId: account.id,
+          providerAccountId: account.providerAccountId
+        });
+      }
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unknown error during calendar discovery";
-
-      results.push({
-        accountId: decryptedAccount.id,
-        providerAccountId: decryptedAccount.providerAccountId,
-        status: "error",
-        discovered: 0,
-        stored: 0,
-        message
-      });
+      // Skip accounts with errors and continue with others
+      console.error(`Failed to fetch calendars for account ${account.id}:`, error);
+      continue;
     }
   }
 
-  return results;
+  return allCalendars;
 }

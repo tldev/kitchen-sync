@@ -14,18 +14,9 @@ export default async function SignInPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-md flex-col items-center justify-center gap-8 text-center">
-      <div className="space-y-3">
-        <h2 className="text-3xl font-semibold text-emerald-300">Access Kitchen Sync</h2>
-        <p className="text-sm text-slate-300">
-          Sign in with your Google account to manage CalendarSync automation jobs. Authentication is required to protect your
-          schedules and connected calendars.
-        </p>
-      </div>
+    <div className="mx-auto flex max-w-md flex-col items-center justify-center gap-6 text-center">
+      <h2 className="text-2xl font-semibold text-gray-900">Sign In</h2>
       <SignInButton className="px-6 py-2.5" />
-      <p className="text-xs text-slate-500">
-        By continuing you agree to securely share your Google profile information for session management.
-      </p>
     </div>
   );
 }

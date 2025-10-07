@@ -42,39 +42,32 @@ export default function AnalyticsSummary({
   const problematicRuns = failedRuns + cancelledRuns;
 
   return (
-    <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-8">
-      <div className="space-y-6">
-        <div className="space-y-2">
-          <h3 className="text-xl font-semibold text-emerald-300">Automation insights</h3>
-          <p className="text-sm text-slate-400">
-            Telemetry helps you understand how often teammates visit the dashboard and whether scheduled jobs are staying
-            healthy.
-          </p>
-        </div>
+    <section className="rounded-lg border border-gray-200 bg-white p-6">
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900">Stats</h3>
         <div className="grid gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-slate-800/70 bg-slate-950/60 p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Dashboard views</p>
-            <p className="mt-3 text-3xl font-semibold text-emerald-100">{totalPageViews}</p>
-            <p className="mt-2 text-xs text-slate-500">{formatDate(lastPageViewAt)}</p>
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Views</p>
+            <p className="mt-2 text-3xl font-semibold text-gray-900">{totalPageViews}</p>
+            <p className="mt-1 text-xs text-gray-400">{formatDate(lastPageViewAt)}</p>
           </div>
-          <div className="rounded-2xl border border-slate-800/70 bg-slate-950/60 p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Job success rate</p>
-            <p className="mt-3 text-3xl font-semibold text-emerald-100">{formatPercentage(jobSuccessRate)}</p>
-            <p className="mt-2 text-xs text-slate-500">
-              {jobSuccessRate === null ? "No completed runs yet" : `Based on ${completedRuns} completed runs.`}
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Success Rate</p>
+            <p className="mt-2 text-3xl font-semibold text-gray-900">{formatPercentage(jobSuccessRate)}</p>
+            <p className="mt-1 text-xs text-gray-400">
+              {jobSuccessRate === null ? "No runs yet" : `${completedRuns} runs`}
             </p>
           </div>
-          <div className="rounded-2xl border border-slate-800/70 bg-slate-950/60 p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Run outcomes</p>
-            <div className="mt-3 space-y-2 text-sm text-slate-300">
+          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Results</p>
+            <div className="mt-2 space-y-1 text-sm text-gray-900">
               <p>
-                <span className="text-emerald-300">{successfulRuns}</span> successful
+                <span className="font-semibold text-green-600">{successfulRuns}</span> successful
               </p>
               <p>
-                <span className="text-rose-300">{problematicRuns}</span> needing attention
+                <span className="font-semibold text-red-600">{problematicRuns}</span> failed
               </p>
             </div>
-            <p className="mt-2 text-xs text-slate-500">Includes failed and cancelled runs.</p>
           </div>
         </div>
       </div>

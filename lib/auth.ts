@@ -25,12 +25,20 @@ export const authOptions: NextAuthOptions = {
         params: {
           prompt: "consent",
           access_type: "offline",
-          response_type: "code"
+          response_type: "code",
+          scope: "openid email profile https://www.googleapis.com/auth/calendar"
         }
       }
     })
   ],
   callbacks: {
+    async signIn({ account, profile }) {
+      // Store the email from the profile in the account
+      if (account && profile && profile.email) {
+        account.email = profile.email;
+      }
+      return true;
+    },
     async jwt({ token }) {
       if (token.sub) {
         token.userId = token.sub;

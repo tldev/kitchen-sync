@@ -7,6 +7,13 @@ import {
   runCalendarSync,
 } from "./executor";
 import { writeRunLog } from "./run-logs";
+import { buildCliConfig } from "@/lib/yaml-preview";
+import { writeAuthStorageFile } from "./auth-storage";
+import { writeFile } from "fs/promises";
+import { join } from "path";
+import { tmpdir } from "os";
+import { mkdtemp, rm } from "fs/promises";
+import { randomUUID } from "crypto";
 
 const LOG_PREFIX = "[sync-job-runner]";
 
@@ -143,8 +150,6 @@ async function executeRun(
 ): Promise<boolean> {
   const { run } = claimed;
   const job = run.job;
-
-  const config = buildCalendarSyncConfig(job);
   const startTime = new Date();
 
   let message = "";
@@ -156,10 +161,51 @@ async function executeRun(
   let binaryPath: string | undefined;
   let durationMs = 0;
   let logLocation: string | null = null;
+  let tempDir: string | undefined;
 
   try {
+    // Create temp directory for this run
+    tempDir = await mkdtemp(join(tmpdir(), `calendarsync-${randomUUID()}-`));
+    const authStoragePath = join(tempDir, "auth-storage.yaml");
+
+    // Check if both accounts have auth storage
+    const sourceAuthStorage = job.sourceCalendar.account.calendarSyncAuthStorage;
+    const destAuthStorage = job.destinationCalendar.account.calendarSyncAuthStorage;
+
+    if (!sourceAuthStorage && !destAuthStorage) {
+      throw new Error(
+        "Neither source nor destination account has CalendarSync auth storage configured. " +
+        "Please set up auth storage for at least one account."
+      );
+    }
+
+    // If accounts are different and both have auth storage, we need to merge them
+    // If same account or only one has storage, use whichever is available
+    let authStorageContent: string;
+    if (job.sourceCalendar.accountId === job.destinationCalendar.accountId) {
+      // Same account - use its auth storage
+      authStorageContent = sourceAuthStorage || destAuthStorage || "";
+    } else if (sourceAuthStorage && destAuthStorage) {
+      // Different accounts, both have storage - we'll use source's for now
+      // TODO: Merge both auth storages if needed
+      logger.warn?.(
+        `${LOG_PREFIX} Both source and destination accounts have auth storage. Using source account's storage.`
+      );
+      authStorageContent = sourceAuthStorage;
+    } else {
+      // One has storage, use it
+      authStorageContent = sourceAuthStorage || destAuthStorage || "";
+    }
+
+    // Write auth storage to temp file
+    await writeAuthStorageFile(authStoragePath, authStorageContent);
+
+    // Build config with auth storage path
+    const config = buildCalendarSyncConfig(job, authStoragePath);
+
     const result = await runCalendarSync({
       config,
+      workingDirectory: tempDir,
       onStdout: (chunk) => {
         stdout += chunk;
       },
@@ -186,6 +232,15 @@ async function executeRun(
     signal = failureDetails.signal ?? signal;
     durationMs = failureDetails.durationMs ?? durationMs;
     binaryPath = failureDetails.binaryPath ?? binaryPath;
+  } finally {
+    // Clean up temp directory
+    if (tempDir) {
+      try {
+        await rm(tempDir, { recursive: true, force: true });
+      } catch (error) {
+        logger.warn?.(`${LOG_PREFIX} Failed to clean up temp directory ${tempDir}`, error);
+      }
+    }
   }
 
   try {
@@ -254,8 +309,18 @@ function extractFailureDetails(
 } {
   if (error instanceof CalendarSyncExecutionError) {
     const { result } = error;
+    
+    // Include stderr in the message for better debugging
+    let message = `CalendarSync exited with code ${result.exitCode ?? "unknown"}.`;
+    if (result.stderr && result.stderr.trim()) {
+      // Get last few lines of stderr for the message (keep it concise)
+      const stderrLines = result.stderr.trim().split('\n');
+      const lastLines = stderrLines.slice(-3).join('\n');
+      message += `\n\nError output:\n${lastLines}`;
+    }
+    
     return {
-      message: `CalendarSync exited with code ${result.exitCode ?? "unknown"}.`,
+      message,
       stdout: result.stdout,
       stderr: result.stderr,
       exitCode: result.exitCode,
@@ -283,30 +348,23 @@ function extractFailureDetails(
   };
 }
 
-function buildCalendarSyncConfig(job: JobRunWithRelations["job"]): CalendarSyncConfig {
+function buildCalendarSyncConfig(
+  job: JobRunWithRelations["job"],
+  authStoragePath: string
+): CalendarSyncConfig {
   const transformers = extractConfigArray(job.config, "transformers");
   const filters = extractConfigArray(job.config, "filters");
 
-  return {
-    metadata: {
-      jobId: job.id,
-      jobName: job.name,
-    },
-    source: {
-      type: "googleCalendar",
-      calendarId: job.sourceCalendar.googleCalendarId,
-      accountId: job.sourceCalendar.account.providerAccountId,
-      timeZone: job.sourceCalendar.timeZone,
-    },
-    destination: {
-      type: "googleCalendar",
-      calendarId: job.destinationCalendar.googleCalendarId,
-      accountId: job.destinationCalendar.account.providerAccountId,
-      timeZone: job.destinationCalendar.timeZone,
-    },
+  // Build CLI-compatible config
+  return buildCliConfig({
+    sourceCalendarId: job.sourceCalendar.googleCalendarId,
+    sourceAccountId: job.sourceCalendar.account.providerAccountId,
+    destinationCalendarId: job.destinationCalendar.googleCalendarId,
+    destinationAccountId: job.destinationCalendar.account.providerAccountId,
     transformers,
     filters,
-  } satisfies CalendarSyncConfig;
+    authStoragePath,
+  });
 }
 
 function extractConfigArray(

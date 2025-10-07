@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthSession } from "@/lib/auth";
+import { fetchLiveCalendarsForUser } from "@/lib/google/calendars";
 import { prisma } from "@/lib/prisma";
 
 const SAFE_ACCOUNT_FIELDS = {
@@ -18,23 +19,50 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const calendars = await prisma.calendar.findMany({
-    where: {
+  try {
+    // Fetch calendars directly from Google's API for up-to-date data
+    const liveCalendars = await fetchLiveCalendarsForUser(session.user.id);
+    
+    // Format to match expected structure with account information
+    const calendars = liveCalendars.map(cal => ({
+      id: cal.id,
+      googleCalendarId: cal.googleCalendarId,
+      summary: cal.summary,
+      timeZone: cal.timeZone,
+      description: cal.description,
+      color: cal.color,
+      accessRole: cal.accessRole,
+      accountId: cal.accountId,
       account: {
-        userId: session.user.id
+        id: cal.accountId,
+        providerAccountId: cal.providerAccountId,
+        provider: "google",
+        type: "oauth"
       }
-    },
-    orderBy: {
-      summary: "asc"
-    },
-    include: {
-      account: {
-        select: SAFE_ACCOUNT_FIELDS
-      }
-    }
-  });
+    }));
 
-  return NextResponse.json(calendars);
+    return NextResponse.json(calendars.sort((a, b) => a.summary.localeCompare(b.summary)));
+  } catch (error) {
+    console.error("Failed to fetch live calendars:", error);
+    // Fallback to database if Google API fails
+    const calendars = await prisma.calendar.findMany({
+      where: {
+        account: {
+          userId: session.user.id
+        }
+      },
+      orderBy: {
+        summary: "asc"
+      },
+      include: {
+        account: {
+          select: SAFE_ACCOUNT_FIELDS
+        }
+      }
+    });
+
+    return NextResponse.json(calendars);
+  }
 }
 
 export async function POST(request: Request) {

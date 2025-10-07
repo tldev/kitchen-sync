@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.env
+.env.local
+.env.docker
+calendarsync-data
+*.log
+dist
+build
+coverage
+.DS_Store
+
+
