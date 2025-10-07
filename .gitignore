@@ -22,3 +22,4 @@ prisma/*.db
 .DS_Store
 .env
 .env.docker
+calendarsync-data/
