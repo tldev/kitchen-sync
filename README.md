@@ -5,7 +5,7 @@ full-stack Next.js application with the following foundations:
 
 - **TypeScript** via the Next.js App Router.
 - **Tailwind CSS** for a composable design system.
-- **next-auth** prepared for Google authentication flows.
+- **next-auth** prepared for Google authentication flows, including multi-account linking with encrypted token storage.
 - **Prisma** as the data access layer for PostgreSQL.
 - **Dockerfile** for containerized builds and deployment.
 
@@ -27,8 +27,14 @@ Copy the provided template to configure local environment variables:
 cp .env.example .env.local
 ```
 
-Update the database credentials or OAuth secrets as needed. The same keys are used by Docker Compose via `.env.docker` (copy the
-example to `.env.docker`).
+Update the database credentials or OAuth secrets as needed. Provide a 32-byte `TOKEN_ENCRYPTION_KEY` (base64 or hex) so OAuth
+refresh tokens can be encrypted before being stored in PostgreSQL. You can generate a compatible key with:
+
+```bash
+openssl rand -base64 32
+```
+
+The same keys are used by Docker Compose via `.env.docker` (copy the example to `.env.docker`).
 
 ## Docker Compose stack
 

@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
+import LinkGoogleAccountButton from "@/components/link-google-account-button";
 import { getAuthSession } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
 export default async function HomePage() {
   const session = await getAuthSession();
@@ -9,6 +11,24 @@ export default async function HomePage() {
   }
 
   const displayName = session.user?.name ?? session.user?.email ?? "there";
+  const linkedAccounts = await prisma.account.findMany({
+    where: { userId: session.user.id },
+    orderBy: { createdAt: "asc" }
+  });
+  const googleAccounts = linkedAccounts.filter((account) => account.provider === "google");
+
+  const formatAccountId = (value: string) => {
+    if (value.length <= 8) {
+      return value;
+    }
+
+    return `${value.slice(0, 4)}…${value.slice(-4)}`;
+  };
+
+  const linkedDateFormatter = new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  });
 
   return (
     <div className="space-y-10">
@@ -44,6 +64,44 @@ export default async function HomePage() {
               A production-ready Dockerfile packages the app, paving the way for docker-compose orchestration in later tasks.
             </p>
           </div>
+        </div>
+      </section>
+      <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-xl font-semibold text-emerald-300">Linked Google accounts</h3>
+            <p className="mt-1 text-sm text-slate-400">
+              Connect additional Google identities to power cross-account calendar synchronisation. Tokens are stored encrypted
+              in PostgreSQL.
+            </p>
+          </div>
+          <LinkGoogleAccountButton />
+        </div>
+        <div className="mt-6 space-y-3">
+          {googleAccounts.length === 0 ? (
+            <p className="rounded-xl border border-slate-800/80 bg-slate-950/50 p-4 text-sm text-slate-400">
+              Your primary sign-in account is ready. Link another Google account to start configuring cross-calendar syncs.
+            </p>
+          ) : (
+            googleAccounts.map((account, index) => {
+              const maskedId = formatAccountId(account.providerAccountId);
+              const linkedLabel = index === 0 ? "Primary sign-in account" : "Linked account";
+              const linkedAt = linkedDateFormatter.format(account.createdAt);
+
+              return (
+                <div
+                  key={account.id}
+                  className="flex flex-col gap-2 rounded-xl border border-slate-800/80 bg-slate-950/60 p-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-emerald-200">{linkedLabel}</p>
+                    <p className="text-xs text-slate-400">Google account ID: {maskedId}</p>
+                  </div>
+                  <p className="text-xs text-slate-500">Linked on {linkedAt}</p>
+                </div>
+              );
+            })
+          )}
         </div>
       </section>
       <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-8">
