@@ -1,8 +1,20 @@
-export default function HomePage() {
+import { redirect } from "next/navigation";
+import { getAuthSession } from "@/lib/auth";
+
+export default async function HomePage() {
+  const session = await getAuthSession();
+
+  if (!session) {
+    redirect("/signin");
+  }
+
+  const displayName = session.user?.name ?? session.user?.email ?? "there";
+
   return (
     <div className="space-y-10">
       <section className="rounded-2xl border border-slate-800 bg-slate-900/60 p-8 shadow-xl shadow-emerald-500/5">
         <h2 className="text-2xl font-semibold text-emerald-300">Welcome to Kitchen Sync</h2>
+        <p className="mt-2 text-sm text-slate-400">Signed in as {displayName}.</p>
         <p className="mt-4 text-slate-300">
           This Next.js scaffold combines Tailwind CSS styling, next-auth authentication hooks, and Prisma ORM integrations.
           It serves as the foundation for orchestrating Google-to-Google calendar synchronization using the CalendarSync CLI.
