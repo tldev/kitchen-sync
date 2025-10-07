@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { SyncJobCadence, SyncJobStatus } from "@prisma/client";
 import { getAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { validateConfigPayload } from "@/lib/sync-job-transformers";
 
 type CreateSyncJobPayload = {
   name?: string;
@@ -9,7 +10,7 @@ type CreateSyncJobPayload = {
   destinationCalendarId?: string;
   cadence?: SyncJobCadence;
   status?: SyncJobStatus;
-  config?: Record<string, unknown> | null;
+  config?: unknown;
 };
 
 function isValidCadence(value: unknown): value is SyncJobCadence {
@@ -91,6 +92,21 @@ export async function POST(request: Request) {
     );
   }
 
+  const sanitizedConfigResult = validateConfigPayload(config ?? null);
+
+  if (!sanitizedConfigResult.success) {
+    return NextResponse.json(
+      {
+        error: `Invalid configuration provided: ${sanitizedConfigResult.errors.join(" ")}`,
+      },
+      { status: 400 }
+    );
+  }
+
+  const sanitizedConfig = sanitizedConfigResult.config;
+  const hasConfig =
+    sanitizedConfig.transformers.length > 0 || sanitizedConfig.filters.length > 0;
+
   const calendars = await prisma.calendar.findMany({
     where: {
       id: {
@@ -122,7 +138,7 @@ export async function POST(request: Request) {
       destinationCalendarId,
       cadence,
       status: status ?? SyncJobStatus.ACTIVE,
-      config: config ?? null
+      config: hasConfig ? sanitizedConfig : null
     },
     include: {
       sourceCalendar: true,
