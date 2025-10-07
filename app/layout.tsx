@@ -1,3 +1,4 @@
+import "@/lib/scheduler";
 import Image from "next/image";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
