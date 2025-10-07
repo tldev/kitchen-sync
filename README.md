@@ -44,3 +44,20 @@ Apply Prisma migrations after the services are running:
 ```bash
 docker compose run --rm web npx prisma migrate deploy
 ```
+
+### CalendarSync binary integration
+
+The Docker image now bundles the CalendarSync CLI. The binary is downloaded during the build stage via the
+`CALENDARSYNC_VERSION` build argument (default: `v0.6.2`). If you need to pin to a different release or provide an internal
+mirror, override `CALENDARSYNC_DOWNLOAD_URL` when invoking `docker build`:
+
+```bash
+docker build \
+  --build-arg CALENDARSYNC_VERSION=v0.6.3 \
+  --build-arg CALENDARSYNC_DOWNLOAD_URL=https://example.com/calendarsync.tar.gz \
+  -t calendarsync-app .
+```
+
+Within application code, use the `runCalendarSync` helper from `lib/calendarsync/executor` to generate configuration files and
+stream CLI logs. The helper throws a `CalendarSyncExecutionError` when the process exits with a non-zero status, exposing the
+captured stdout/stderr for debugging.
