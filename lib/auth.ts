@@ -1,6 +1,8 @@
 import { getServerSession } from "next-auth";
 import type { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import { createEncryptedPrismaAdapter } from "@/lib/encrypted-prisma-adapter";
+import { prisma } from "@/lib/prisma";
 
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -19,6 +21,7 @@ if (!nextAuthSecret) {
 }
 
 export const authOptions: NextAuthOptions = {
+  adapter: createEncryptedPrismaAdapter(prisma),
   secret: nextAuthSecret,
   session: {
     strategy: "jwt"
