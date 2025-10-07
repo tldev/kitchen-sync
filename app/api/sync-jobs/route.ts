@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { SyncJobCadence, SyncJobStatus } from "@prisma/client";
+import { Prisma, SyncJobCadence, SyncJobStatus } from "@prisma/client";
 import { getAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { validateConfigPayload } from "@/lib/sync-job-transformers";
@@ -138,7 +138,7 @@ export async function POST(request: Request) {
       destinationCalendarId,
       cadence,
       status: status ?? SyncJobStatus.ACTIVE,
-      config: hasConfig ? sanitizedConfig : null
+      config: hasConfig ? (sanitizedConfig as unknown as Prisma.InputJsonValue) : Prisma.DbNull
     },
     include: {
       sourceCalendar: true,

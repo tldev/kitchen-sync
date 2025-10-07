@@ -38,13 +38,17 @@ export type CalendarDiscoveryResult = {
   message?: string;
 };
 
-const googleClientId = process.env.GOOGLE_CLIENT_ID;
-const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+function getGoogleCredentials(): { clientId: string; clientSecret: string } {
+  const googleClientId = process.env.GOOGLE_CLIENT_ID;
+  const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
-if (!googleClientId || !googleClientSecret) {
-  throw new Error(
-    "Missing Google OAuth environment variables. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to discover calendars."
-  );
+  if (!googleClientId || !googleClientSecret) {
+    throw new Error(
+      "Missing Google OAuth environment variables. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to discover calendars."
+    );
+  }
+
+  return { clientId: googleClientId, clientSecret: googleClientSecret };
 }
 
 function maybeDecryptToken(value: string | null): string | null {
@@ -60,14 +64,16 @@ function maybeDecryptToken(value: string | null): string | null {
 }
 
 async function exchangeRefreshToken(refreshToken: string): Promise<OAuthTokenResponse> {
+  const { clientId, clientSecret } = getGoogleCredentials();
+  
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded"
     },
     body: new URLSearchParams({
-      client_id: googleClientId,
-      client_secret: googleClientSecret,
+      client_id: clientId,
+      client_secret: clientSecret,
       grant_type: "refresh_token",
       refresh_token: refreshToken
     }).toString()

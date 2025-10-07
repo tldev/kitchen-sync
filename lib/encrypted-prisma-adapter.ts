@@ -1,4 +1,4 @@
-import type { Adapter, AdapterAccount } from "next-auth/adapters";
+import type { Adapter, AdapterAccount, AdapterUser, AdapterSession } from "next-auth/adapters";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { encryptToken, decryptToken } from "@/lib/encryption";
 
@@ -43,16 +43,19 @@ function decryptAccountTokens<T extends { [key: string]: unknown }>(account: T):
 
 export function createEncryptedPrismaAdapter(prisma: PrismaClient): Adapter {
   return {
-    async createUser(data) {
-      return prisma.user.create({ data });
+    async createUser(data: Prisma.UserCreateInput) {
+      const user = await prisma.user.create({ data });
+      return user as AdapterUser;
     },
-    async getUser(id) {
-      return prisma.user.findUnique({ where: { id } });
+    async getUser(id: string) {
+      const user = await prisma.user.findUnique({ where: { id } });
+      return user as AdapterUser | null;
     },
-    async getUserByEmail(email) {
-      return prisma.user.findUnique({ where: { email } });
+    async getUserByEmail(email: string) {
+      const user = await prisma.user.findUnique({ where: { email } });
+      return user as AdapterUser | null;
     },
-    async getUserByAccount({ provider, providerAccountId }) {
+    async getUserByAccount({ provider, providerAccountId }: { provider: string; providerAccountId: string }) {
       const account = await prisma.account.findUnique({
         where: { provider_providerAccountId: { provider, providerAccountId } },
         include: { user: true }
@@ -62,20 +65,21 @@ export function createEncryptedPrismaAdapter(prisma: PrismaClient): Adapter {
         return null;
       }
 
-      return account.user;
+      return account.user as AdapterUser;
     },
-    async updateUser(data) {
+    async updateUser(data: Partial<Prisma.UserUpdateInput> & { id: string }) {
       const { id, ...updateData } = data;
       if (!id) {
         throw new Error("Cannot update user without id");
       }
 
-      return prisma.user.update({ where: { id }, data: updateData });
+      const user = await prisma.user.update({ where: { id }, data: updateData });
+      return user as AdapterUser;
     },
-    async deleteUser(id) {
-      return prisma.user.delete({ where: { id } });
+    async deleteUser(id: string) {
+      await prisma.user.delete({ where: { id } });
     },
-    async linkAccount(account) {
+    async linkAccount(account: AdapterAccount) {
       const { id, ...rest } = encryptAccountTokens(account);
       const createData = rest as Prisma.AccountUncheckedCreateInput;
       const updateData = rest as Prisma.AccountUncheckedUpdateInput;
@@ -93,15 +97,22 @@ export function createEncryptedPrismaAdapter(prisma: PrismaClient): Adapter {
 
       return decryptAccountTokens(storedAccount) as AdapterAccount;
     },
-    async unlinkAccount({ provider, providerAccountId }) {
+    async unlinkAccount({ provider, providerAccountId }: { provider: string; providerAccountId: string }) {
       return prisma.account.delete({
         where: { provider_providerAccountId: { provider, providerAccountId } }
       });
     },
-    async createSession(data) {
-      return prisma.session.create({ data });
+    async createSession(data: { sessionToken: string; userId: string; expires: Date }) {
+      const session = await prisma.session.create({ 
+        data: {
+          sessionToken: data.sessionToken,
+          userId: data.userId,
+          expires: data.expires
+        }
+      });
+      return session as AdapterSession;
     },
-    async getSessionAndUser(sessionToken) {
+    async getSessionAndUser(sessionToken: string) {
       const session = await prisma.session.findUnique({
         where: { sessionToken },
         include: { user: true }
@@ -112,29 +123,30 @@ export function createEncryptedPrismaAdapter(prisma: PrismaClient): Adapter {
       }
 
       return {
-        session,
-        user: session.user
+        session: session as AdapterSession,
+        user: session.user as AdapterUser
       };
     },
-    async updateSession(data) {
+    async updateSession(data: Partial<Prisma.SessionUpdateInput> & { sessionToken: string }) {
       const { sessionToken, ...updateData } = data;
 
       if (!sessionToken) {
         throw new Error("Cannot update session without sessionToken");
       }
 
-      return prisma.session.update({
+      const session = await prisma.session.update({
         where: { sessionToken },
         data: updateData
       });
+      return session as AdapterSession;
     },
-    async deleteSession(sessionToken) {
-      return prisma.session.delete({ where: { sessionToken } });
+    async deleteSession(sessionToken: string) {
+      await prisma.session.delete({ where: { sessionToken } });
     },
-    async createVerificationToken(data) {
+    async createVerificationToken(data: Prisma.VerificationTokenCreateInput) {
       return prisma.verificationToken.create({ data });
     },
-    async useVerificationToken({ identifier, token }) {
+    async useVerificationToken({ identifier, token }: { identifier: string; token: string }) {
       try {
         return await prisma.verificationToken.delete({
           where: { identifier_token: { identifier, token } }
@@ -145,34 +157,6 @@ export function createEncryptedPrismaAdapter(prisma: PrismaClient): Adapter {
         }
         throw error;
       }
-    },
-    async updateAccount(account) {
-      const { provider, providerAccountId } = account;
-      const { id, ...rest } = encryptAccountTokens(account);
-      const data = rest as Prisma.AccountUncheckedUpdateInput;
-
-      return decryptAccountTokens(
-        await prisma.account.update({
-          where: {
-            provider_providerAccountId: {
-              provider,
-              providerAccountId
-            }
-          },
-          data
-        })
-      ) as AdapterAccount;
-    },
-    async getAccount(provider_providerAccountId) {
-      const account = await prisma.account.findUnique({
-        where: { provider_providerAccountId }
-      });
-
-      if (!account) {
-        return null;
-      }
-
-      return decryptAccountTokens(account) as AdapterAccount;
     }
   } satisfies Adapter;
 }

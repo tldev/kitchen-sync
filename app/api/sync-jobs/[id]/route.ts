@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { SyncJobCadence, SyncJobStatus } from "@prisma/client";
+import { Prisma, SyncJobCadence, SyncJobStatus } from "@prisma/client";
 import { getAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -111,7 +111,7 @@ export async function PATCH(
     data.status = body.status;
   }
   if (body.config !== undefined) {
-    data.config = body.config;
+    data.config = body.config === null ? Prisma.DbNull : (body.config as unknown as Prisma.InputJsonValue);
   }
   if (body.lastRunAt !== undefined) {
     data.lastRunAt = body.lastRunAt ? new Date(body.lastRunAt) : null;

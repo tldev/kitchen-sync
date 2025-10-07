@@ -4,21 +4,9 @@ import GoogleProvider from "next-auth/providers/google";
 import { createEncryptedPrismaAdapter } from "@/lib/encrypted-prisma-adapter";
 import { prisma } from "@/lib/prisma";
 
-const googleClientId = process.env.GOOGLE_CLIENT_ID;
-const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
-const nextAuthSecret = process.env.NEXTAUTH_SECRET;
-
-if (!googleClientId || !googleClientSecret) {
-  throw new Error(
-    "Missing Google OAuth environment variables. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to use Google authentication."
-  );
-}
-
-if (!nextAuthSecret) {
-  throw new Error(
-    "Missing NEXTAUTH_SECRET environment variable. Set NEXTAUTH_SECRET to secure NextAuth sessions."
-  );
-}
+const googleClientId = process.env.GOOGLE_CLIENT_ID || "";
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || "";
+const nextAuthSecret = process.env.NEXTAUTH_SECRET || "";
 
 export const authOptions: NextAuthOptions = {
   adapter: createEncryptedPrismaAdapter(prisma),

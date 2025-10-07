@@ -1,4 +1,4 @@
-import { TelemetryEventType } from "@prisma/client";
+import { TelemetryEventType, Prisma } from "@prisma/client";
 
 import { prisma } from "./prisma";
 
@@ -15,7 +15,7 @@ export async function recordPageView({ userId, path, metadata }: RecordPageViewO
         type: TelemetryEventType.PAGE_VIEW,
         path,
         userId: userId ?? undefined,
-        metadata: metadata ? metadata : undefined,
+        metadata: metadata ? (metadata as Prisma.InputJsonValue) : undefined,
       },
     });
   } catch (error) {

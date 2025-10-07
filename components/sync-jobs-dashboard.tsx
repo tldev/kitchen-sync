@@ -97,7 +97,9 @@ export default function SyncJobsDashboard({ jobs }: SyncJobsDashboardProps) {
         <div className="space-y-5">
           {jobs.map((job) => {
             const lastRun = job.runs[0] ?? null;
-            const hasError = lastRun ? [JobRunStatus.FAILED, JobRunStatus.CANCELLED].includes(lastRun.status) : false;
+            const hasError = lastRun
+              ? lastRun.status === JobRunStatus.FAILED || lastRun.status === JobRunStatus.CANCELLED
+              : false;
             const sourceAccountLabel = formatAccountId(job.sourceCalendar.account.providerAccountId);
             const destinationAccountLabel = formatAccountId(job.destinationCalendar.account.providerAccountId);
 
