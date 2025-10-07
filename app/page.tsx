@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import LinkGoogleAccountButton from "@/components/link-google-account-button";
 import SyncJobPlanner from "@/components/sync-job-planner";
 import type { CalendarOption } from "@/components/sync-job-planner";
+import SyncJobsDashboard from "@/components/sync-jobs-dashboard";
 import { getAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -49,6 +50,27 @@ export default async function HomePage() {
   const linkedDateFormatter = new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeStyle: "short"
+  });
+
+  const syncJobs = await prisma.syncJob.findMany({
+    where: {
+      ownerId: session.user.id
+    },
+    orderBy: {
+      createdAt: "desc"
+    },
+    include: {
+      sourceCalendar: {
+        include: { account: true }
+      },
+      destinationCalendar: {
+        include: { account: true }
+      },
+      runs: {
+        orderBy: { startedAt: "desc" },
+        take: 5
+      }
+    }
   });
 
   const calendarOptions: CalendarOption[] = calendars.map((calendar) => ({
@@ -137,6 +159,7 @@ export default async function HomePage() {
       <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-8">
         <SyncJobPlanner calendars={calendarOptions} />
       </section>
+      <SyncJobsDashboard jobs={syncJobs} />
       <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-8">
         <h3 className="text-xl font-semibold text-emerald-300">Next Steps</h3>
         <ol className="mt-4 list-decimal space-y-2 pl-6 text-sm text-slate-300">
