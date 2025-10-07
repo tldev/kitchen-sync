@@ -91,8 +91,15 @@ export function buildCliConfig(options: CliConfigOptions): any {
   const cliFilters = mapToCliFormat(options.filters, "filter");
 
   // Get actual OAuth credentials from environment
-  const googleClientId = process.env.GOOGLE_CLIENT_ID;
-  const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const isBrowser = typeof window !== "undefined";
+  let googleClientId = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  let googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_SECRET;
+
+  // On the client, env secrets are not exposed. For preview purposes, fall back to placeholders
+  if ((!googleClientId || !googleClientSecret) && isBrowser) {
+    googleClientId = googleClientId ?? "<server-provided>";
+    googleClientSecret = googleClientSecret ?? "<server-provided>";
+  }
 
   if (!googleClientId || !googleClientSecret) {
     throw new Error(

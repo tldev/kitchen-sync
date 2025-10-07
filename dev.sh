@@ -18,6 +18,7 @@ case "${1:-start}" in
     echo -e "\n${GREEN}✅ Development server starting!${NC}"
     echo -e "${BLUE}📝 Next.js will be available at: http://localhost:3000${NC}"
     echo -e "${BLUE}📊 PostgreSQL available at: localhost:5432${NC}"
+    echo -e "${BLUE}🗄️  Adminer (Postgres UI): http://localhost:8080${NC}"
     echo -e "\n${YELLOW}💡 Tips:${NC}"
     echo -e "  - Code changes will hot-reload automatically"
     echo -e "  - View logs: ${BLUE}./dev.sh logs${NC}"
