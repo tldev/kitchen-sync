@@ -86,18 +86,20 @@ export async function POST(
       for (const calendar of account.calendars) {
         accountTokens.push({
           calendarId: calendar.googleCalendarId,
-          accessToken: accessToken || refreshToken,
+          accessToken: accessToken ?? "",
           refreshToken,
           expiresAt: account.expires_at ?? undefined,
+          tokenType: account.token_type ?? undefined,
         });
       }
     } else {
       // No calendars discovered yet - create a single entry using email or account ID
       accountTokens.push({
         calendarId: account.email || account.providerAccountId,
-        accessToken: accessToken || refreshToken,
+        accessToken: accessToken ?? "",
         refreshToken,
         expiresAt: account.expires_at ?? undefined,
+        tokenType: account.token_type ?? undefined,
       });
     }
 
@@ -199,4 +201,3 @@ export async function GET(
     );
   }
 }
-

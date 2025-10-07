@@ -8,20 +8,19 @@ import YAML from "yaml";
 /**
  * CalendarAuth structure matching CalendarSync's Go struct
  */
-interface CalendarAuth {
-  CalendarID: string;
-  access_token: string;
-  refresh_token: string;
-  token_type: string;
-  expiry?: string; // ISO 8601 timestamp
-}
+type CalendarAuthEntry = {
+  calendarID: string;
+  oAuth2: {
+    accessToken: string;
+    refreshToken: string;
+    tokenType: string;
+    expiry?: string;
+  };
+};
 
-/**
- * Storage file structure matching CalendarSync's format
- */
-interface StorageFile {
-  Calendars: CalendarAuth[];
-}
+type StorageFile = {
+  calendars: CalendarAuthEntry[];
+};
 
 export interface AccountTokens {
   /** Google calendar ID (e.g., email or calendar@group.calendar.google.com) */
@@ -32,6 +31,8 @@ export interface AccountTokens {
   refreshToken: string;
   /** Token expiry timestamp (Unix seconds) */
   expiresAt?: number;
+  /** OAuth token type (defaults to Bearer) */
+  tokenType?: string;
 }
 
 /**
@@ -44,7 +45,7 @@ export interface AccountTokens {
  * 3. Returns the encrypted content as a string (to store in database)
  * 
  * @param accounts - Array of account tokens to include in auth storage
- * @returns Base64-encoded encrypted auth storage file content
+ * @returns AGE-armored encrypted auth storage file content
  */
 export async function createAuthStorageFile(accounts: AccountTokens[]): Promise<string> {
   const encryptionKey = process.env.CALENDARSYNC_ENCRYPTION_KEY;
@@ -57,14 +58,16 @@ export async function createAuthStorageFile(accounts: AccountTokens[]): Promise<
 
   // Build CalendarSync's auth storage structure
   const storageFile: StorageFile = {
-    Calendars: accounts.map((account) => ({
-      CalendarID: account.calendarId,
-      access_token: account.accessToken,
-      refresh_token: account.refreshToken,
-      token_type: "Bearer",
-      expiry: account.expiresAt
-        ? new Date(account.expiresAt * 1000).toISOString()
-        : undefined,
+    calendars: accounts.map((account) => ({
+      calendarID: account.calendarId,
+      oAuth2: {
+        accessToken: account.accessToken,
+        refreshToken: account.refreshToken,
+        tokenType: account.tokenType ?? "Bearer",
+        expiry: account.expiresAt
+          ? new Date(account.expiresAt * 1000).toISOString()
+          : undefined,
+      },
     })),
   };
 
@@ -104,13 +107,12 @@ async function encryptWithAge(content: string, passphrase: string): Promise<stri
         tempOutputFile,
         tempInputFile,
       ], {
-        stdio: ["pipe", "pipe", "pipe"],
+        stdio: ["ignore", "pipe", "pipe"],
+        env: {
+          ...process.env,
+          AGE_PASSPHRASE: passphrase,
+        },
       });
-
-      // Write passphrase to stdin
-      age.stdin.write(passphrase + "\n");
-      age.stdin.write(passphrase + "\n"); // age asks for confirmation
-      age.stdin.end();
 
       let stderr = "";
       age.stderr?.on("data", (chunk) => {
@@ -180,4 +182,3 @@ export async function isAgeAvailable(): Promise<boolean> {
     });
   });
 }
-

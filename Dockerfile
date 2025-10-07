@@ -2,7 +2,7 @@
 
 FROM node:20-slim AS base
 WORKDIR /app
-RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y openssl age && rm -rf /var/lib/apt/lists/*
 
 FROM base AS calendarsync
 ARG CALENDARSYNC_VERSION=0.10.1

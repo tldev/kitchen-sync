@@ -5,7 +5,7 @@ FROM node:20-slim
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y openssl curl tar zsh && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y openssl curl tar zsh age && rm -rf /var/lib/apt/lists/*
 
 # Download CalendarSync binary
 ARG CALENDARSYNC_VERSION=0.10.1
@@ -44,4 +44,3 @@ EXPOSE 3000
 
 # Use dev mode with hot reloading
 CMD ["npm", "run", "dev"]
-

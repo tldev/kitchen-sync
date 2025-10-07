@@ -24,12 +24,13 @@ CalendarSync uses [AGE encryption](https://github.com/FiloSottile/age) to store 
 
 ```yaml
 # Encrypted with AGE (starts with "age-encryption.org")
-Calendars:
-  - CalendarID: "calendar@example.com"
-    access_token: "ya29...."
-    refresh_token: "1//..."
-    token_type: "Bearer"
-    expiry: "2024-01-01T00:00:00Z"
+calendars:
+  - calendarID: "calendar@example.com"
+    oAuth2:
+      accessToken: "ya29...."
+      refreshToken: "1//..."
+      tokenType: "Bearer"
+      expiry: "2024-01-01T00:00:00Z"
 ```
 
 ## Challenge: Background Job Execution
@@ -237,4 +238,3 @@ npx prisma migrate dev --name add_calendarsync_auth_storage
 3. **NEW**: User clicks "Setup CalendarSync Auth" for each account
 4. ✅ User creates sync jobs (existing flow)
 5. ✅ Sync jobs run automatically in background
-
