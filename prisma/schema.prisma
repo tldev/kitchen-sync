@@ -26,6 +26,10 @@ enum JobRunStatus {
   CANCELLED
 }
 
+enum TelemetryEventType {
+  PAGE_VIEW
+}
+
 model User {
   id            String    @id @default(uuid()) @db.Uuid
   name          String?
@@ -133,4 +137,16 @@ model JobRun {
 
   @@index([status])
   @@index([jobId, startedAt])
+}
+
+model TelemetryEvent {
+  id        String              @id @default(uuid()) @db.Uuid
+  eventType TelemetryEventType
+  route     String
+  userId    String?             @db.Uuid
+  metadata  Json?
+  createdAt DateTime            @default(now())
+
+  @@index([eventType, createdAt])
+  @@index([route])
 }

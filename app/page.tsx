@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
+import AnalyticsOverview from "@/components/analytics-overview";
 import LinkGoogleAccountButton from "@/components/link-google-account-button";
 import SyncJobPlanner from "@/components/sync-job-planner";
 import type { CalendarOption } from "@/components/sync-job-planner";
 import { getAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getAnalyticsSummary, recordPageView } from "@/lib/telemetry";
 
 export default async function HomePage() {
   const session = await getAuthSession();
@@ -11,6 +13,10 @@ export default async function HomePage() {
   if (!session) {
     redirect("/signin");
   }
+
+  await recordPageView("/", session.user?.id ?? undefined);
+
+  const analyticsSummary = await getAnalyticsSummary();
 
   const displayName = session.user?.name ?? session.user?.email ?? "there";
   const linkedAccounts = await prisma.account.findMany({
@@ -137,6 +143,7 @@ export default async function HomePage() {
       <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-8">
         <SyncJobPlanner calendars={calendarOptions} />
       </section>
+      <AnalyticsOverview summary={analyticsSummary} />
       <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-8">
         <h3 className="text-xl font-semibold text-emerald-300">Next Steps</h3>
         <ol className="mt-4 list-decimal space-y-2 pl-6 text-sm text-slate-300">
