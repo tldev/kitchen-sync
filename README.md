@@ -21,27 +21,49 @@ milestones will introduce the Prisma schema, database services, and CalendarSync
 
 ## Environment configuration
 
-Copy the provided template to configure local environment variables:
+Create a `.env.local` file with the following variables (or copy from `env.local.example` if available):
 
 ```bash
-cp .env.example .env.local
+# Database
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/calendarsync?schema=public"
+
+# NextAuth
+NEXTAUTH_SECRET="your-secret-here-generate-with-openssl-rand-base64-32"
+NEXTAUTH_URL="http://localhost:3000"
+
+# Google OAuth
+GOOGLE_CLIENT_ID="your-google-client-id"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"
+
+# Token Encryption (generate with: openssl rand -base64 32)
+TOKEN_ENCRYPTION_KEY="your-32-byte-base64-encoded-key"
+
+# CalendarSync Configuration
+CALENDARSYNC_BINARY="/usr/local/bin/calendarsync"
+CALENDARSYNC_LOG_DIR="./calendarsync-data/logs"
+
+# Scheduler Configuration (optional)
+SYNC_JOB_SCHEDULER_DISABLED="false"
+SYNC_JOB_SCHEDULER_CRON="*/1 * * * *"
+
+# Observability (optional)
+# SENTRY_DSN=""
+# LOGTAIL_SOURCE_TOKEN=""
 ```
 
-Update the database credentials or OAuth secrets as needed. Provide a 32-byte `TOKEN_ENCRYPTION_KEY` (base64 or hex) so OAuth
-refresh tokens can be encrypted before being stored in PostgreSQL. You can generate a compatible key with:
+Generate a secure `NEXTAUTH_SECRET` and `TOKEN_ENCRYPTION_KEY` with:
 
 ```bash
 openssl rand -base64 32
 ```
 
-The same keys are used by Docker Compose via `.env.docker` (copy the example to `.env.docker`).
+For Docker Compose, create a `.env.docker` file (or copy from `env.docker.example`).
 
 ## Docker Compose stack
 
-The monolithic V1 can be started with PostgreSQL using Docker Compose:
+The monolithic V1 can be started with PostgreSQL using Docker Compose. First, create a `.env.docker` file (or copy from `env.docker.example`):
 
 ```bash
-cp .env.docker.example .env.docker
 docker compose up --build
 ```
 
@@ -49,6 +71,14 @@ Apply Prisma migrations after the services are running:
 
 ```bash
 docker compose run --rm web npx prisma migrate deploy
+```
+
+## Health checks
+
+The application exposes a health check endpoint at `/api/health` that reports the status of the database connection and job scheduler. Use this for monitoring and load balancer health checks:
+
+```bash
+curl http://localhost:3000/api/health
 ```
 
 ### CalendarSync binary integration

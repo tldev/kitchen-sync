@@ -1,4 +1,5 @@
 import "@/lib/scheduler";
+import { initializeObservability } from "@/lib/observability";
 import Image from "next/image";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
@@ -6,6 +7,11 @@ import { getAuthSession } from "@/lib/auth";
 import SignInButton from "@/components/sign-in-button";
 import SignOutButton from "@/components/sign-out-button";
 import "./globals.css";
+
+// Initialize observability on server startup
+if (typeof window === "undefined") {
+  initializeObservability();
+}
 
 export const metadata: Metadata = {
   title: "CalendarSync Automations",

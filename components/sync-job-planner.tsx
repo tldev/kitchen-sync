@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   OPTION_DEFINITIONS,
   createDefaultOptionState,
@@ -59,6 +60,9 @@ type SyncJobPlannerProps = {
 };
 
 export default function SyncJobPlanner({ calendars }: SyncJobPlannerProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const [sourceId, setSourceId] = useState(() => calendars[0]?.id ?? "");
   const [destinationId, setDestinationId] = useState(() => {
     if (calendars.length >= 2) {
@@ -114,6 +118,43 @@ export default function SyncJobPlanner({ calendars }: SyncJobPlannerProps) {
         },
       },
     }));
+  };
+
+  const handleSaveJob = async () => {
+    if (!canContinue) {
+      return;
+    }
+
+    setError(null);
+
+    startTransition(async () => {
+      try {
+        const response = await fetch("/api/sync-jobs", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: `${selectedSource?.summary} → ${selectedDestination?.summary}`,
+            sourceCalendarId: sourceId,
+            destinationCalendarId: destinationId,
+            cadence,
+            status: "ACTIVE",
+            config: optionStates,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error ?? "Failed to create sync job");
+        }
+
+        // Refresh the page to show the new job
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "An unexpected error occurred");
+      }
+    });
   };
 
   const renderFieldInput = (
@@ -418,20 +459,26 @@ export default function SyncJobPlanner({ calendars }: SyncJobPlannerProps) {
                 )}
               </div>
             </div>
+            {error ? (
+              <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-100">
+                <p className="font-semibold">Failed to create sync job</p>
+                <p className="mt-1 text-rose-100/80">{error}</p>
+              </div>
+            ) : null}
             <button
               type="button"
-              disabled={!canContinue}
+              onClick={handleSaveJob}
+              disabled={!canContinue || isPending}
               className={`w-full rounded-xl px-4 py-3 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-emerald-500/40 sm:w-auto ${
-                canContinue
+                canContinue && !isPending
                   ? "bg-emerald-500 text-emerald-950 hover:bg-emerald-400"
                   : "cursor-not-allowed bg-slate-800 text-slate-500"
               }`}
             >
-              Save sync job (coming soon)
+              {isPending ? "Creating sync job…" : "Create sync job"}
             </button>
             <p className="text-xs text-slate-500">
-              This planner saves your selections locally for now. The next milestone will persist sync jobs and wire up
-              CalendarSync execution.
+              Once created, the sync job will be scheduled according to the selected cadence and will run automatically.
             </p>
           </div>
           <div className="space-y-3">

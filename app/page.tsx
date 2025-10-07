@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import AnalyticsSummary from "@/components/analytics-summary";
+import CalendarDiscoveryTrigger from "@/components/calendar-discovery-trigger";
 import LinkGoogleAccountButton from "@/components/link-google-account-button";
 import SyncJobPlanner from "@/components/sync-job-planner";
 import type { CalendarOption } from "@/components/sync-job-planner";
@@ -220,18 +221,15 @@ export default async function HomePage() {
         </div>
       </section>
       <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-8">
-        <SyncJobPlanner calendars={calendarOptions} />
+        <CalendarDiscoveryTrigger
+          hasCalendars={calendars.length > 0}
+          hasLinkedAccounts={googleAccounts.length > 0}
+        />
+        <div className={calendars.length > 0 ? "mt-6" : ""}>
+          <SyncJobPlanner calendars={calendarOptions} />
+        </div>
       </section>
       <SyncJobsDashboard jobs={syncJobs} />
-      <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-8">
-        <h3 className="text-xl font-semibold text-emerald-300">Next Steps</h3>
-        <ol className="mt-4 list-decimal space-y-2 pl-6 text-sm text-slate-300">
-          <li>Define Prisma schema and database migrations.</li>
-          <li>Introduce docker-compose services for database and scheduler workers.</li>
-          <li>Wire up next-auth Google provider and secure token handling.</li>
-          <li>Integrate CalendarSync CLI execution pipelines.</li>
-        </ol>
-      </section>
     </div>
   );
 }
