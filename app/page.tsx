@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
 import LinkGoogleAccountButton from "@/components/link-google-account-button";
+import SyncJobPlanner from "@/components/sync-job-planner";
+import type { CalendarOption } from "@/components/sync-job-planner";
 import { getAuthSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -17,6 +19,25 @@ export default async function HomePage() {
   });
   const googleAccounts = linkedAccounts.filter((account) => account.provider === "google");
 
+  const calendars = await prisma.calendar.findMany({
+    where: {
+      account: {
+        userId: session.user.id
+      }
+    },
+    include: {
+      account: {
+        select: {
+          id: true,
+          providerAccountId: true
+        }
+      }
+    },
+    orderBy: {
+      summary: "asc"
+    }
+  });
+
   const formatAccountId = (value: string) => {
     if (value.length <= 8) {
       return value;
@@ -29,6 +50,15 @@ export default async function HomePage() {
     dateStyle: "medium",
     timeStyle: "short"
   });
+
+  const calendarOptions: CalendarOption[] = calendars.map((calendar) => ({
+    id: calendar.id,
+    googleCalendarId: calendar.googleCalendarId,
+    summary: calendar.summary,
+    timeZone: calendar.timeZone,
+    accountId: calendar.account.id,
+    accountLabel: formatAccountId(calendar.account.providerAccountId)
+  }));
 
   return (
     <div className="space-y-10">
@@ -103,6 +133,9 @@ export default async function HomePage() {
             })
           )}
         </div>
+      </section>
+      <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-8">
+        <SyncJobPlanner calendars={calendarOptions} />
       </section>
       <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-8">
         <h3 className="text-xl font-semibold text-emerald-300">Next Steps</h3>
